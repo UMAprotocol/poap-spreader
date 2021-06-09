@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "discord.js": "discordjs/discord.js#master",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^15.12.2"
+  }
+}
