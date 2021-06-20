@@ -1,6 +1,8 @@
 import { Client, StageChannel, User } from 'discord.js';
-import { readFileSync } from 'fs';
+import { readFileSync, appendFileSync, writeFileSync } from 'fs';
+import { RateLimiter } from 'limiter';
 
+const SUSHI_GUILD_ID = "748031363935895552"
 const AMA_CHANNEL_ID = "827196357290229801"
 
 const client = new Client({ intents: ['DIRECT_MESSAGES', 'GUILDS', 'GUILD_VOICE_STATES', 'GUILD_WEBHOOKS', 'GUILD_MEMBERS']});
@@ -9,15 +11,30 @@ const token = readFileSync("token.txt", {encoding: "utf-8"});
 const message = readFileSync("message.txt", {encoding: "utf-8"});
 const poaps = readFileSync("poaps.txt", {encoding: "utf-8"}).split("\n");
 
+const delay = 10; // in seconds
+const requiredLogs = 30;
+
+let poapsSent = 0;
+let failedUserIds: string[] = [];
+
+const limiter = new RateLimiter({ tokensPerInterval: 100, interval: 60000 });
+
 main()
 
 async function main() {
     await logIn();
+    writeFileSync("failed.txt", "");
 
-    const users = await collectUsers();
+    const users: {[user: string]: number} = {};
 
-    await sendMessages(users);
-    process.exit();
+    while(true) {
+        (await collectUsers()).forEach(user => {
+            users[user.id] = users[user.id] ? users[user.id] + 1 : 1;
+            if(users[user.id] === requiredLogs) sendMessage(user);
+        })
+
+        await sleep(delay * 1000);
+    }
 }
 
 async function logIn() {
@@ -31,10 +48,21 @@ async function collectUsers() {
     return stage.members.map(a => a.user);
 }
 
-async function sendMessages(users: User[]) {
-    for(var i = 0; i < users.length; i++) {
-        await users[i].send(poaps[i] + "\n\n" + message);
-    }
+async function sendMessage(user: User) {
+    await limiter.removeTokens(1);
 
-    console.log(`${i} POAPs were sent.`)
+    try {
+        await user.send(poaps[poapsSent] + "\n\n" + message);
+        poapsSent++;
+    }
+    catch(err) {
+        console.log(err)
+        console.log("Failed to send message to: " + user.username);
+        failedUserIds.push(user.id);
+        appendFileSync("failed.txt", user.id + "\n");
+    }
+}
+
+function sleep(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
