@@ -12,10 +12,9 @@ const message = readFileSync("message.txt", {encoding: "utf-8"});
 const poaps = readFileSync("poaps.txt", {encoding: "utf-8"}).split("\n");
 
 const delay = 10; // in seconds
-const requiredLogs = 30;
+const requiredLogs = 2;
 
 let poapsSent = 0;
-let failedUserIds: string[] = [];
 
 const limiter = new RateLimiter({ tokensPerInterval: 100, interval: 60000 });
 
@@ -49,16 +48,16 @@ async function collectUsers() {
 }
 
 async function sendMessage(user: User) {
+    const poapsSentLocal = poapsSent;
+    poapsSent++
+
     await limiter.removeTokens(1);
 
     try {
-        await user.send(poaps[poapsSent] + "\n\n" + message);
-        poapsSent++;
+        await user.send(poaps[poapsSentLocal] + "\n\n" + message);
     }
     catch(err) {
-        console.log(err)
         console.log("Failed to send message to: " + user.username);
-        failedUserIds.push(user.id);
         appendFileSync("failed.txt", user.id + "\n");
     }
 }
